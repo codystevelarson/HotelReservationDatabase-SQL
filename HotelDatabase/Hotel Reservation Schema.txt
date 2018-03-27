@@ -1,0 +1,314 @@
+Hotel reservation system:
+-----------------------------------------------------------------------------------------------------------------------------
+REQUIREMENTS:
+
+- MUST keep track of all ROOM info:
+	ROOM INFORMATION:
+		- Room Numbers
+		- Room Floor
+		- Room Occupancy Limit
+		- Room Type
+			-Double
+			-King
+			-Etc.
+		- Room Amenities
+			-Fridge
+			-Hot Tub
+			-Etc.
+
+- Customer MUST be able to make a RESERVATION:
+	RESERVATION:
+		- Customer Contact
+			-Name
+			-Phone
+			-Email
+		- Can reserve multiple ROOMS
+		- Reservation Date range
+			-Start
+			-End
+		- Reservation List of Names of Guests
+		- Reservation List of Ages of Guests
+		- PROMOTION CODE
+
+- Track ROOM RATES:
+	RATES:
+		- Rates based on ROOM TYPE 
+		- Rates vary by RESERVATION DATE RANGE
+			-Vary by season or event 
+
+- Track ADD ONS:
+	ADDONS:
+		- Guests may order Addons
+			- Room service
+			- Movies
+			- etc.
+		- Addons have fees
+		- Addon fees change over time 
+
+- Track BILLING:
+	BILLING:
+		- TAX Column
+		- TOTAL Column
+	BILLING DETAILS:
+		- Room Addons
+		- Reservation ID
+
+- Allow PROMOTION CODES:
+	PROMOTIONS:
+		- Promotion has a DATE RANGE
+		- Promotion may be % Discount
+		- Promotion may be $ Amount
+		- Promotions attached to RESERVATION
+--------------------------------------------------------------------------------------------------------------------		
+DELLIVERY:
+	- Table layout from ssms
+		- Proper Naming Conventions
+		- 2nd normal form!
+	- Database creation script
+		- With all tables, columns, and relationships
+		- Reasonable assumptions of column data types
+			- Be able to justify descisions
+		- Should be re-runable
+			- Drop the database at the top of the script
+
+
+
+====================================================================================================================
+Hotel Reservation Schema:
+====================================================================================================================
+
+TODO:
+
+RELATIONSHIPS:
+	- Rooms To RoomTypes (1 to 1)
+	- RoomTypes to Rooms (1 to Many)
+	- Rooms to Amenities (Many to Many)
+	- Customers to Reservations (1 to Many)
+	- Reservations to Guests (1 to Many)
+	- Reservations to Rooms (Many to Many)
+	- Promotions to Reservations (Many to 1)
+	- Rates to Rooms (Many to Many)
+	- AddOns to Reservation (Many to Many)
+
+::TABLES::
+	Rooms:
+		- RoomNum, INT PK
+		- FloorNum, INT NOT NULL
+		- RoomType, INT FK REFERENCES RoomType(RoomTypeID) NOT NULL
+		- OccupancyLimit, INT NOT NULL
+
+	RoomTypes:
+		- TypeID, INT PK IDENTITY(1,1)
+		- TypeName, NVARCHAR() NOT NULL 
+	
+	Amenities:
+		- AmenityID, INT PK IDENTITY(1,1)
+		- Description NVARCHAR() NOT NULL
+	
+	RoomAmenities: (BRIDGE)
+		- RoomNumber, INT FK REFERENCES Room(RoomID) NOT NULL
+		- AmenityID, INT FK REFERENCES Amenity(AmenityID)
+		
+	Reservations:
+		- ReservationID, INT PK IDENTITY(1,1)
+		- CustomerID, INT FK REFERENCES Customers(CustomerID) NOT NULL
+		- CheckIn, DateTime2 NOT NULL
+		- CheckOut, DateTime2 NOT NULL
+		- PromotionCode, NCHAR(6) FK REFERENCES Promotions(PromotionCode)
+
+	ReservationRooms: (BRIDGE)	
+		- ReservationID, INT FK REFERENCES Reservations(ReservationID) NOT NULL
+		- RoomNumber, INT FK REFERENCES Rooms(RoomNumber) NOT NULL
+
+	Customers:
+		- CustomerID, INT PK IDENTITY(1,1)
+		- FirstName, NVARCHAR() NOT NULL
+		- LastName, NVARCHAR() NOT NULL
+		- Email, NVARCHAR()
+		- Phone, NVARCHAR() NOT NULL
+
+	Guests:
+		- GuestID, INT PK IDENTITY(1,1)
+		- ReservationID, INT FK REFERENCES Reservations(ReservationID) NOT NULL
+		- FirstName, NVARCHAR() NOT NULL
+		- LastName, NVARCHAR() NOT NULL
+		- Age, TINYINT NOT NULL
+	
+	Promotions:
+		- PromotionCode NCHAR(8) PK 
+		- StartDate, Date NOT NULL
+		- EndDate, Date NOT NULL
+		- Discount, DECIMAL 
+		- DiscountType, NVARCHAR() NOT NULL
+		
+	Rates:
+		- RateID, INT PK IDENTITY(1,1)
+		- StartDate, DateTime2 NOT NULL
+		- EndDate, DateTime2 NOT NULL
+		- Description, NVARCHAR() NOT NULL
+
+	RoomRates: (BRIDGE)
+		- RoomNumber, INT FK REFERENCES Rooms(RoomNumber) NOT NULL
+		- RateID, INT FK REFERENCES Rates(RateID) NOT NULL
+		- Price, Decimal NOT NULL
+	
+	AddOns:
+		- AddOnID, INT PK IDENTITY(1,1)
+		- TypeOf, NVARCHAR() NOT NULL
+		- StartDate, DateTime2 NOT NULL
+		- EndDate, DateTime2 NOT NULL
+		- Price, DECIMAL 
+	
+	ReservationAddOns:
+		- AddOnID, INT FK REFERENCES AddOns(AddOnID) NOT NULL
+		- ReservationID, INT FK REFERENCES Reservations(ReservationID) NOT NULL
+	
+	Billing
+		- BillID, INT PK IDENTITY(1,1)
+		- ReservationID, INT FK REFERENCES Reservations(ReservationID)
+		- Total, DECIMAL NOT NULL DEFAULT 0
+		- Tax, DECIMAL NOT NULL DEFAULT 0
+
+	
+====================================================================================================================
+CREATION SCRIPT RAW
+====================================================================================================================	
+	
+USE master
+GO
+
+if exists (select * from sysdatabases where name='HotelReservationDB')
+		drop database HotelReservationDB
+GO
+
+CREATE DATABASE HotelReservationDB
+GO
+
+USE HotelReservationDB
+GO
+
+CREATE TABLE RoomType (
+	TypeID INT PRIMARY KEY IDENTITY(1,1),
+	TypeName NVARCHAR(50) NOT NULL -- 50 Char, could be named King/PentHouse/HoneyMoon/Balcony or something extra like that
+)
+
+CREATE TABLE Rooms (
+	RoomNum INT PRIMARY KEY, --All room numbers should be unique and represent the floor they are on 233 (Floor 2 Room 33)
+	FloorNum INT NOT NULL,
+	RoomType INT FOREIGN KEY REFERENCES RoomType(TypeID) NOT NULL,
+	Occupancy INT NOT NULL 
+)
+
+CREATE TABLE Amenities (
+	AmenityID INT PRIMARY KEY IDENTITY(1,1),
+	Description NVARCHAR(30) NOT NULL
+)
+
+
+CREATE TABLE RoomAmenities ( --Bridge--
+	RoomNum INT FOREIGN KEY REFERENCES Rooms(RoomNum) NOT NULL,
+	AmenityID INT FOREIGN KEY REFERENCES Amenities(AmenityID) NOT NULL
+)
+
+CREATE TABLE Customers (
+	CustomerID INT PRIMARY KEY IDENTITY(1,1),
+	FirstName NVARCHAR(35) NOT NULL,
+	LastName NVARCHAR(35) NOT NULL,
+	Email NVARCHAR(60), --Don't require an email because it could be fake
+	Phone NVARCHAR(50) NOT NULL, --Must provide phone number 
+	Phone2 NVARCHAR(50) -- For second contact point 
+	--Ideally Credit Card Number would be stored and encrypted here to prevent fraudulent/prank reservations, but that sounds 'tuff' right now
+)
+
+CREATE TABLE Promotions (
+	PromotionCode NCHAR(6) PRIMARY KEY --ex. FL1830(fall 2018 30% off), SB1999(Spring Break 2019 $99 off)
+	StartDate DATE NOT NULL,
+	EndDate DATE NOT NULL,
+	Discount DECIMAL(4,2), --Discounts up to 0.00 - 9999.99, ex.TSTW20(Two Suites Two Weeks $2000 Off ) <--Sweet Deal
+	DiscountType NVARCHAR(100) NOT NULL --Could be % or $ based OR Myriad of perks like Free Gym Access/Water Park Passes/Bike Rental/etc.
+)
+
+CREATE TABLE Reservations(
+	ReservationID INT PRIMARY KEY IDENTITY(1,1),
+	CustomerID INT FOREIGN KEY REFERENCES Customers(CustomerID) NOT NULL,
+	CheckIn DATETIME2 NOT NULL, --Want both date and time of day 
+	CheckOut DATETIME2 NOT NULL,
+	PromotionCode NCHAR(6) FOREIGN KEY REFERENCES Promotions(PromotionCode)
+)
+
+CREATE TABLE ReservationRooms ( --Bridge--
+	ReservationID INT FOREIGN KEY REFERENCES Reservations(ReservationID),
+	RoomNum INT FOREIGN KEY REFERENCES Rooms(RoomNum)
+)
+
+CREATE TABLE Guests (
+	GuestID INT PRIMARY KEY IDENTITY(1,1),
+	ReservationID INT FOREIGN KEY REFERENCES Reservations(ReservationID) NOT NULL, --Guest data should not be collected and stored for multiple reservations because of minor and privacy concerns.
+	FirstName NVARCHAR(35) NOT NULL,
+	LastName NVARCHAR(35) NOT NULL,
+	Age TINYINT NOT NULL --Tiny int because we don't allow Wizards, Shamen, Or Demi-Gods over the age of 255 here, not anymore..
+)
+
+CREATE TABLE Rates (
+	RateID INT PRIMARY KEY IDENTITY(1,1),
+	StartDate DATETIME2 NOT NULL, -- DATETIME2 because there could be specail rates depending on the hour or the day 
+	EndDate DATETIME2 NOT NULL,
+	PriceDescription NVARCHAR(50) NOT NULL
+)
+
+CREATE TABLE RoomRates ( --Bridge--
+	RoomNum INT FOREIGN KEY REFERENCES Rooms(RoomNum) NOT NULL,
+	RateID INT FOREIGN KEY REFERENCES Rates(RateID) NOT NULL
+)
+
+CREATE TABLE AddOns (
+	AddOnID INT PRIMARY KEY IDENTITY(1,1),
+	TypeOf NVARCHAR(50) NOT NULL, -- Could be a lengthy description for a name
+	StartDate DATETIME2 NOT NULL, --Time sensitive for things like Happy-Hour-Mini-Bar tracked by the sensors in the fridge
+	EndDate DATETIME2 NOT NULL,
+	Price DECIMAL(7,2) NOT NULL -- $0.00 - $9,999,999.99 because some people ball out! OR trash a room and cause major damage
+)
+
+CREATE TABLE ReservationAddOns ( --Bridge--
+	AddOnID INT FOREIGN KEY REFERENCES AddOns(AddOnID) NOT NULL,
+	ReservationID INT FOREIGN KEY REFERENCES Reservations(ReservationID) NOT NULL
+)
+
+CREATE TABLE Billing (
+	BillID INT PRIMARY KEY IDENTITY(1,1),
+	ReservationID INT FOREIGN KEY REFERENCES Reservations(ReservationID) NOT NULL,
+	Total DECIMAL (10,2) NOT NULL DEFAULT 0, -- $0.00 - $9,999,999,999.99 (For some money is but an object. We will gladly lighted the load of their sagging pockets. They could probably buy the place, but I wouldn't bring that up)
+	Tax DECIMAL (9,2) NOT NULL DEFAULT 0 --Default 0 for total and tax for if the room is comp'd by mgmt
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
